@@ -2,26 +2,29 @@
 #define MODULE_HPP
 
 #include <cuda.h>
+//#include <nvrtc.h>
+
 #include "bindings.hpp"
 
 namespace NodeCuda {
 
   class Module : public ObjectWrap {
     public:
-      static void Initialize(Handle<Object> target);
-      static Handle<Value> GetFunction(const Arguments& args);
+      static void Initialize(v8::Handle<v8::Object> target);
+      static void GetFunction(const v8::FunctionCallbackInfo<v8::Value>& args);
 
     protected:
-      static Persistent<FunctionTemplate> constructor_template;
+		static v8::Persistent<v8::Function> constructor;
 
-      static Handle<Value> Load(const Arguments& args);
+      static void Load(const v8::FunctionCallbackInfo<v8::Value>& args);
+	  static void RuntimeCompile(const v8::FunctionCallbackInfo<v8::Value>& args);
 
       Module() : ObjectWrap(), m_module(0) {}
 
       ~Module() {}
 
     private:
-      static Handle<Value> New(const Arguments& args);
+      static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
       CUmodule m_module;
   };

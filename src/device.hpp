@@ -8,20 +8,20 @@ namespace NodeCuda {
 
   class Device : public ObjectWrap {
     public:
-      static void Initialize(Handle<Object> target);
+      static void Initialize(v8::Handle<v8::Object> target);
 
     protected:
-      static Persistent<FunctionTemplate> constructor_template;
+		static v8::Persistent<v8::Function> constructor;
 
-      static Handle<Value> New(const Arguments& args);
-      static Handle<Value> GetComputeCapability(Local<String> property, const AccessorInfo &info);
-      static Handle<Value> GetName(Local<String> property, const AccessorInfo &info);
-      static Handle<Value> GetTotalMem(Local<String> property, const AccessorInfo &info);
+      static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+	  static void GetComputeCapability(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value> &info);
+	  static void GetName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value> &info);
+	  static void GetTotalMem(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value> &info);
 
       // TODO: cuDeviceGetAttribute
       // TODO: cuDeviceGetProperties
 
-      Device() : ObjectWrap(), m_device(NULL) {}
+      Device() : ObjectWrap(), m_device(0) {}
 
       ~Device() {}
 

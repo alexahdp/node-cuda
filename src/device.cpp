@@ -1,75 +1,93 @@
 #include "device.hpp"
 
+using namespace v8;
 using namespace NodeCuda;
 
-Persistent<FunctionTemplate> Device::constructor_template;
+v8::Persistent<v8::Function> Device::constructor;
 
 void Device::Initialize(Handle<Object> target) {
-  HandleScope scope;
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Device::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
-  constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
-  constructor_template->SetClassName(String::NewSymbol("CudaDevice"));
+	Local<FunctionTemplate> t = FunctionTemplate::New(isolate, Device::New);
+  t->InstanceTemplate()->SetInternalFieldCount(1);
+  t->SetClassName(String::NewFromUtf8(isolate,"CudaDevice"));
 
-  constructor_template->InstanceTemplate()->SetAccessor(String::New("name"), Device::GetName);
-  constructor_template->InstanceTemplate()->SetAccessor(String::New("totalMem"), Device::GetTotalMem);
-  constructor_template->InstanceTemplate()->SetAccessor(String::New("computeCapability"), Device::GetComputeCapability);
+  t->InstanceTemplate()->SetAccessor(String::NewFromUtf8(isolate,"name"), Device::GetName);
+  t->InstanceTemplate()->SetAccessor(String::NewFromUtf8(isolate,"totalMem"), Device::GetTotalMem);
+  t->InstanceTemplate()->SetAccessor(String::NewFromUtf8(isolate,"computeCapability"), Device::GetComputeCapability);
 
-  target->Set(String::NewSymbol("Device"), constructor_template->GetFunction());
+	// https://nodejs.org/api/addons.html#addons_wrapping_c_objects
+  //NODE_SET_PROTOTYPE_METHOD(t, "Device", PlusOne);
+  
+  target->Set(String::NewFromUtf8(isolate,"Device"), t->GetFunction());
+
+  constructor.Reset(isolate, t->GetFunction());
 }
 
 static Handle<Value> GetName_(CUdevice device) {
-  HandleScope scope;
-  char deviceName[256];
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
+	char deviceName[256];
 
   cuDeviceGetName(deviceName, 256, device);
-  Local<String> result = String::New(deviceName);
-  return scope.Close(result);
+  Local<String> result = String::NewFromUtf8(isolate,deviceName);
+  return result;
 }
 
-Handle<Value> Device::New(const Arguments& args) {
-  HandleScope scope;
-  Local<Object> result = args.This();
-  int ordinal = args[0]->IntegerValue();
+void Device::New(const FunctionCallbackInfo<Value>& args) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
-  if (!constructor_template->HasInstance(result)) {
-    result = constructor_template->InstanceTemplate()->NewInstance();
-  }
+	if (args.IsConstructCall()) {
+		// Invoked as constructor: `new MyObject(...)`
+		Device *pdevice = new Device();
+		cuDeviceGet(&(pdevice->m_device), args[0]->IntegerValue());
+		pdevice->Wrap(args.This());
+		args.GetReturnValue().Set(args.This());
 
-  Device *pdevice = new Device();
-  cuDeviceGet(&(pdevice->m_device), ordinal);
+	}
+	else {
+		// Invoked as plain function `MyObject(...)`, turn into construct call.
+		const int argc = 1;
+		Local<Value> argv[argc] = { args[0] };
+		Local<Function> cons = Local<Function>::New(isolate, constructor);
+		args.GetReturnValue().Set(cons->NewInstance(argc, argv));
+	}
 
-  pdevice->Wrap(result);
-  return scope.Close(result);
 }
 
-Handle<Value> Device::GetComputeCapability(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
+void Device::GetComputeCapability(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
   Device *pdevice = ObjectWrap::Unwrap<Device>(info.Holder());
   int major = 0, minor = 0;
   cuDeviceComputeCapability(&major, &minor, pdevice->m_device);
 
-  Local<Object> result = Object::New();
-  result->Set(String::New("major"), Integer::New(major));
-  result->Set(String::New("minor"), Integer::New(minor));
-  return scope.Close(result);
+  Local<Object> result = Object::New(isolate);
+  result->Set(String::NewFromUtf8(isolate,"major"), Integer::New(isolate,major));
+  result->Set(String::NewFromUtf8(isolate,"minor"), Integer::New(isolate,minor));
+  info.GetReturnValue().Set(result);
 }
 
-Handle<Value> Device::GetName(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
+void Device::GetName(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
   Device *pdevice = ObjectWrap::Unwrap<Device>(info.Holder());
-  return GetName_(pdevice->m_device);
+  info.GetReturnValue().Set( GetName_(pdevice->m_device) );
+
 }
 
-Handle<Value> Device::GetTotalMem(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
+void Device::GetTotalMem(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
   Device *pdevice = ObjectWrap::Unwrap<Device>(info.Holder());
   size_t totalGlobalMem;
   cuDeviceTotalMem(&totalGlobalMem, pdevice->m_device);
 
-  return scope.Close(Number::New(totalGlobalMem));
+  info.GetReturnValue().Set(Number::New(isolate,totalGlobalMem));
 }

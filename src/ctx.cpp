@@ -2,30 +2,34 @@
 #include "device.hpp"
 
 using namespace NodeCuda;
+using namespace v8;
 
-Persistent<FunctionTemplate> Ctx::constructor_template;
+v8::Persistent<v8::Function> Ctx::constructor;
 
 void Ctx::Initialize(Handle<Object> target) {
-  HandleScope scope;
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
 
-  Local<FunctionTemplate> t = FunctionTemplate::New(Ctx::New);
-  constructor_template = Persistent<FunctionTemplate>::New(t);
-  constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
-  constructor_template->SetClassName(String::NewSymbol("CudaCtx"));
+    Local<FunctionTemplate> t = FunctionTemplate::New(isolate, Ctx::New);
+    t->InstanceTemplate()->SetInternalFieldCount(1);
+    t->SetClassName(String::NewFromUtf8(isolate, "CudaCtx"));
 
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "destroy", Ctx::Destroy);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "pushCurrent", Ctx::PushCurrent);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "popCurrent", Ctx::PopCurrent);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "setCurrent", Ctx::SetCurrent);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "getCurrent", Ctx::GetCurrent);
-  NODE_SET_PROTOTYPE_METHOD(constructor_template, "synchronize", Ctx::Synchronize);
-  constructor_template->InstanceTemplate()->SetAccessor(String::New("apiVersion"), Ctx::GetApiVersion);
+    NODE_SET_PROTOTYPE_METHOD(t, "destroy", Ctx::Destroy);
+  NODE_SET_PROTOTYPE_METHOD(t, "pushCurrent", Ctx::PushCurrent);
+  NODE_SET_PROTOTYPE_METHOD(t, "popCurrent", Ctx::PopCurrent);
+  NODE_SET_PROTOTYPE_METHOD(t, "setCurrent", Ctx::SetCurrent);
+  NODE_SET_PROTOTYPE_METHOD(t, "getCurrent", Ctx::GetCurrent);
+  NODE_SET_PROTOTYPE_METHOD(t, "synchronize", Ctx::Synchronize);
+  t->InstanceTemplate()->SetAccessor(String::NewFromUtf8(isolate,"apiVersion"), Ctx::GetApiVersion);
 
-  target->Set(String::NewSymbol("Ctx"), constructor_template->GetFunction());
+  target->Set(String::NewFromUtf8(isolate,"Ctx"), t->GetFunction());
+
+  constructor.Reset(isolate, t->GetFunction());
 }
 
-Handle<Value> Ctx::New(const Arguments& args) {
-  HandleScope scope;
+void Ctx::New(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
 
   Ctx *pctx = new Ctx();
   pctx->Wrap(args.This());
@@ -35,70 +39,86 @@ Handle<Value> Ctx::New(const Arguments& args) {
 
   cuCtxCreate(&(pctx->m_context), flags, pctx->m_device);
 
-  return args.This();
+  args.GetReturnValue().Set(args.This());
 }
 
-Handle<Value> Ctx::Destroy(const Arguments& args) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
+void Ctx::Destroy(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
 
   CUresult error = cuCtxDestroy(pctx->m_context);
-  return scope.Close(Number::New(error));
+  args.GetReturnValue().Set(Number::New(isolate,error));
 }
 
-Handle<Value> Ctx::PushCurrent(const Arguments& args) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
+void Ctx::PushCurrent(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
 
   CUresult error = cuCtxPushCurrent(pctx->m_context);
-  return scope.Close(Number::New(error));
+  args.GetReturnValue().Set(Number::New(isolate,error));
 }
 
-Handle<Value> Ctx::PopCurrent(const Arguments& args) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
+void Ctx::PopCurrent(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
 
   CUresult error = cuCtxPopCurrent(&(pctx->m_context));
-  return scope.Close(Number::New(error));
+  args.GetReturnValue().Set(Number::New(isolate,error));
 }
 
-Handle<Value> Ctx::SetCurrent(const Arguments& args) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
+void Ctx::SetCurrent(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
 
   CUresult error = cuCtxSetCurrent(pctx->m_context);
-  return scope.Close(Number::New(error));
+  args.GetReturnValue().Set(Number::New(isolate,error));
 }
 
-Handle<Value> Ctx::GetCurrent(const Arguments& args) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
+void Ctx::GetCurrent(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(args.This());
 
   CUresult error = cuCtxGetCurrent(&(pctx->m_context));
-  return scope.Close(Number::New(error));
+  args.GetReturnValue().Set(Number::New(isolate,error));
 }
 
 struct SynchronizeParams {
   Ctx *ctx;
   CUresult error;
-  Persistent<Function> cb;
+ //Persistent<Function> cb;
+ Local<Function> cb;
 };
 
-Handle<Value> Ctx::Synchronize(const Arguments& args) {
-  HandleScope scope;
+void Ctx::Synchronize(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
 
   if (args.Length() >= 1 && args[0]->IsFunction()) {
     // Asynchronous
     Local<Function> cb = Local<Function>::Cast(args[0]);
 
     Ctx *ctx = ObjectWrap::Unwrap<Ctx>(args.This());
-    if (ctx->sync_in_progress)
-      return scope.Close(Number::New(-1));
+    if (ctx->sync_in_progress){
+        args.GetReturnValue().Set(Number::New(isolate,-1));
+        return;
+    };
 
     SynchronizeParams *params = new SynchronizeParams();
     params->ctx = ctx;
-    params->cb = Persistent<Function>::New(cb);
-
+    //params->cb = Handle<Function>::New(isolate,cb);
+    //params->cb = Local<Function>::New(isolate, cb);
+    params->cb = cb; // Local<Function>::New(isolate, cb);
+    
     cuCtxPopCurrent(NULL);
 
     // build up the work request
@@ -114,12 +134,12 @@ Handle<Value> Ctx::Synchronize(const Arguments& args) {
     ctx->Ref();
     ctx->sync_in_progress = true;
 
-    return Undefined();
+    args.GetReturnValue().Set(Undefined(isolate));
 
   } else {
     // Synchronous
     CUresult error = cuCtxSynchronize();
-    return scope.Close(Number::New(error));
+    args.GetReturnValue().Set(Number::New(isolate,error));
   }
 }
 
@@ -137,7 +157,9 @@ void Ctx::Process(uv_work_t* work_req) {
 
 void Ctx::After(uv_work_t* work_req, int status) {
   assert(status == 0);
-  HandleScope scope;
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+
   SynchronizeParams *params = static_cast<SynchronizeParams*>(work_req->data);
 
   params->ctx->Unref();
@@ -146,23 +168,31 @@ void Ctx::After(uv_work_t* work_req, int status) {
   cuCtxPushCurrent(params->ctx->m_context);
 
   Local<Value> argv[1];
-  argv[0] = Number::New(params->error);
+  argv[0] = Number::New(isolate,params->error);
 
   TryCatch try_catch;
-  params->cb->Call(Context::GetCurrent()->Global(), 1, argv);
+  
+  params->cb->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+  
+  //params->cb->Call(Context::GetCurrent()->Global(), 1, argv);
+  
   if (try_catch.HasCaught()) FatalException(try_catch);
 
-  params->cb.Dispose();
+  // 2015-03-08 как должно быть если мы persistent заменили на handle?
+  // params->cb->Dispose();
+
   uv_unref((uv_handle_t*) work_req);
   delete params;
 }
 
-Handle<Value> Ctx::GetApiVersion(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
-  Ctx *pctx = ObjectWrap::Unwrap<Ctx>(info.Holder());
+void Ctx::GetApiVersion(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
+    Ctx *pctx = ObjectWrap::Unwrap<Ctx>(info.Holder());
 
   unsigned int version;
   CUresult error = cuCtxGetApiVersion(pctx->m_context, &version);
 
-  return scope.Close(Number::New(version));
+  info.GetReturnValue().Set(Number::New(isolate,version));
 }

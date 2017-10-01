@@ -6,16 +6,18 @@
 #include "module.hpp"
 
 using namespace NodeCuda;
+using namespace v8;
 
 void init (Handle<Object> target) {
-  HandleScope scope;
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
 
   // Initiailze the cuda driver api
   cuInit(0);
 
   // These methods don't need instances
-  target->SetAccessor(String::New("driverVersion"), GetDriverVersion);
-  target->SetAccessor(String::New("deviceCount"), GetDeviceCount);
+  target->SetAccessor(String::NewFromUtf8(isolate,"driverVersion"), GetDriverVersion);
+  target->SetAccessor(String::NewFromUtf8(isolate,"deviceCount"), GetDeviceCount);
 
   // Initialize driver api bindings
   Ctx::Initialize(target);
@@ -25,18 +27,22 @@ void init (Handle<Object> target) {
   Module::Initialize(target);
 }
 
-Handle<Value> NodeCuda::GetDriverVersion(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
-  int driverVersion = 0;
+void NodeCuda::GetDriverVersion(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
+	int driverVersion = 0;
   cuDriverGetVersion(&driverVersion);
-  return scope.Close(Integer::New(driverVersion));
+  info.GetReturnValue().Set(Integer::New(isolate,driverVersion));
 }
 
-Handle<Value> NodeCuda::GetDeviceCount(Local<String> property, const AccessorInfo &info) {
-  HandleScope scope;
-  int count = 0;
+void NodeCuda::GetDeviceCount(Local<String> property, const PropertyCallbackInfo<Value> &info) {
+	Isolate* isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
+	int count = 0;
   cuDeviceGetCount(&count);
-  return scope.Close(Integer::New(count));
+  info.GetReturnValue().Set(Integer::New(isolate,count));
 }
 
 NODE_MODULE(cuda, init);

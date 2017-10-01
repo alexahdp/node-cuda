@@ -9,23 +9,23 @@ namespace NodeCuda {
 
   class Function : public ObjectWrap {
     public:
-      static void Initialize(Handle<Object> target);
+      static void Initialize(v8::Handle<v8::Object> target);
 
     protected:
-      static Persistent<FunctionTemplate> constructor_template;
+		static v8::Persistent<v8::Function> constructor;
 
-      static Handle<Value> LaunchKernel(const Arguments& args);
+      static void LaunchKernel(const v8::FunctionCallbackInfo<v8::Value>& args);
 
       Function() : ObjectWrap(), m_function(0) {}
 
       ~Function() {}
 
     private:
-      static Handle<Value> New(const Arguments& args);
+      static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
       CUfunction m_function;
 
-      friend Handle<Value> Module::GetFunction(const Arguments&);
+	  friend void Module::GetFunction(const v8::FunctionCallbackInfo<v8::Value>&);
   };
 
 }
